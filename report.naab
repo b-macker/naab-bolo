@@ -1,12 +1,12 @@
 # ╔══════════════════════════════════════════════════════════════════╗
 # ║  NAAb BOLO — report.naab                                       ║
-# ║  Report Generator — NAAb + C++ + Python polyglot                ║
+# ║  Report Generator — NAAb + Python polyglot                      ║
 # ╚══════════════════════════════════════════════════════════════════╝
 #
-# WHY C++:  SARIF 2.1.0 requires precise JSON schema compliance.
-#           C++ string building generates exact-spec JSON directly.
-# WHY PYTHON: f-strings + html.escape = clean HTML templating.
-#           xml.etree.ElementTree = perfect for JUnit XML generation.
+# WHY PYTHON: json.dumps for SARIF 2.1.0 compliance, f-strings +
+#           html.escape for HTML templating, xml.etree.ElementTree
+#           for JUnit XML, csv.writer for CSV. Python has the best
+#           serialization libraries for every output format.
 # WHY NAAB: Routes between formats, manages file I/O, orchestration.
 
 main {
@@ -92,11 +92,10 @@ main {
     let report_content = ""
 
     # ═══════════════════════════════════════════════════════════════
-    # SARIF 2.1.0 Report — C++ polyglot
-    # WHY C++: SARIF spec demands precise JSON structure with exact
-    #          field names, URI encoding, and region mapping.
-    #          C++ string building generates compliant JSON directly
-    #          without serialization overhead.
+    # SARIF 2.1.0 Report — Python polyglot
+    # WHY PYTHON: json.dumps generates spec-compliant SARIF with
+    #             precise field names, URI encoding, and region mapping.
+    #             Python dicts map naturally to the SARIF JSON schema.
     # ═══════════════════════════════════════════════════════════════
     if format == "sarif" {
         report_content = <<python[all_violations, profile] -> JSON

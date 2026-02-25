@@ -1,11 +1,11 @@
 # ╔══════════════════════════════════════════════════════════════════╗
 # ║  NAAb BOLO — "Be On the Lookout" for bad code                  ║
 # ║  Enterprise LLM & AI Governance Platform                        ║
-# ║  Built 100% in NAAb — polyglot C++, Rust, Python               ║
+# ║  Built 100% in NAAb — polyglot C++, Python, Shell               ║
 # ╚══════════════════════════════════════════════════════════════════╝
 #
-# Main CLI orchestrator — NAAb native + Rust polyglot
-# WHY RUST: Fast recursive directory walking with gitignore support
+# Main CLI orchestrator — NAAb native + Shell polyglot
+# WHY SHELL: Portable file discovery via find command
 # WHY NAAB: Clean CLI parsing, profile management, colored output
 
 main {
@@ -102,9 +102,8 @@ main {
     # ── Load profile ──
     bolo.load_profile(profile)
 
-    # ── Discover files using Rust ──
-    # WHY RUST: walkdir crate = 10x faster than Python os.walk
-    # Respects .gitignore, handles symlinks safely, parallel-ready
+    # ── Discover files using Shell ──
+    # WHY SHELL: find is universal, portable, and fast for file listing
     let files_json = <<shell[target_path]
         find "$target_path" -type f \( \
             -name "*.py" -o -name "*.js" -o -name "*.ts" -o \

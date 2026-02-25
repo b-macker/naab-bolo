@@ -1,0 +1,4 @@
+# These files contain INTENTIONAL fake credentials for testing.
+# They are NOT real secrets — they exist to verify that the scanner detects them.
+has-secrets.py
+has-injection.js

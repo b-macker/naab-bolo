@@ -346,7 +346,7 @@ elif stage == "pr-merge":
     for gate_fn in [compilation_check, import_check, test_check,
                      coverage_check, lint_check, security_check, documentation_check]:
         results["gates"].append(gate_fn(target_path))
-    # All 17 validators
+    # All 16 validators
     for val_fn in [check_apologetic_language, check_code_blocks, check_hardcoded_success,
                     check_hash_integrity, check_placeholders, check_read_before_write,
                     check_replay_data, check_root_cause, check_schema, check_secrets,

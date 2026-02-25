@@ -5,8 +5,14 @@ set -e
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 NAAB_DIR="$SCRIPT_DIR/naab"
 
+if [ ! -d "$NAAB_DIR/CMakeLists.txt" ] 2>/dev/null; then
+    echo "Initializing NAAb submodule..."
+    cd "$SCRIPT_DIR"
+    git submodule update --init --recursive
+fi
+
 if [ ! -d "$NAAB_DIR" ]; then
-    echo "Error: NAAb submodule not found. Run: git submodule update --init"
+    echo "Error: NAAb submodule not found. Run: git submodule update --init --recursive"
     exit 1
 fi
 

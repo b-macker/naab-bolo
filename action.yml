@@ -1,5 +1,5 @@
 name: 'NAAb BOLO'
-description: 'Enterprise LLM & AI governance scanner — 50+ checks via polyglot C++/Python/Rust'
+description: 'Enterprise LLM & AI governance scanner — 50+ checks via polyglot C++/Python'
 branding:
   icon: 'shield'
   color: 'blue'
@@ -38,33 +38,37 @@ runs:
     - name: Setup NAAb
       shell: bash
       run: |
-        cd ${{ github.action_path }}
+        cd "${{ github.action_path }}"
         bash build.sh
 
     - name: Run BOLO Scan
+      id: scan
       shell: bash
+      env:
+        INPUT_PATH: ${{ inputs.path }}
+        INPUT_PROFILE: ${{ inputs.profile }}
+        INPUT_FORMAT: ${{ inputs.format }}
       run: |
-        cd ${{ github.action_path }}
+        cd "${{ github.action_path }}"
         NAAB="./naab/build/naab-lang"
-        REPORT_FILE="${{ runner.temp }}/bolo-report.${{ inputs.format }}"
+        REPORT_FILE="${{ runner.temp }}/bolo-report.${INPUT_FORMAT}"
 
-        # Run scan
-        $NAAB scan.naab ${{ inputs.path }} --profile ${{ inputs.profile }} --format json 2>&1 | tee scan-output.txt
+        # Run scan (inputs passed via env vars to prevent injection)
+        "$NAAB" scan.naab "$INPUT_PATH" --profile "$INPUT_PROFILE" --format json 2>&1 | tee scan-output.txt
 
         # Generate report
-        $NAAB report.naab ${{ inputs.path }} \
-          --format ${{ inputs.format }} \
-          --profile ${{ inputs.profile }} \
+        "$NAAB" report.naab "$INPUT_PATH" \
+          --format "$INPUT_FORMAT" \
+          --profile "$INPUT_PROFILE" \
           --output "$REPORT_FILE"
 
-        echo "report-path=$REPORT_FILE" >> $GITHUB_OUTPUT
+        echo "report-path=$REPORT_FILE" >> "$GITHUB_OUTPUT"
 
-        # Count violations
+        # Count violations from scan output
         VIOLATIONS=$(grep -c "FAIL\|violation" scan-output.txt || echo "0")
-        echo "violations=$VIOLATIONS" >> $GITHUB_OUTPUT
+        echo "violations=$VIOLATIONS" >> "$GITHUB_OUTPUT"
 
-        # Upload SARIF if applicable
-        if [ "${{ inputs.format }}" = "sarif" ]; then
+        if [ "$INPUT_FORMAT" = "sarif" ]; then
           echo "SARIF report generated at: $REPORT_FILE"
         fi
 

@@ -32,9 +32,9 @@ run_suite() {
     output=$("$NAAB" "$file" 2>&1) || true
     echo "$output"
 
-    # Extract PASS/FAIL counts from output
-    suite_pass=$(echo "$output" | grep -c "PASS" || true)
-    suite_fail=$(echo "$output" | grep -c "FAIL" || true)
+    # Extract PASS/FAIL counts from individual test lines (not summary)
+    suite_pass=$(echo "$output" | grep -c "^  PASS" || true)
+    suite_fail=$(echo "$output" | grep -c "^  FAIL" || true)
     TOTAL_PASS=$((TOTAL_PASS + suite_pass))
     TOTAL_FAIL=$((TOTAL_FAIL + suite_fail))
     echo ""

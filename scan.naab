@@ -1,13 +1,13 @@
 # ╔══════════════════════════════════════════════════════════════════╗
 # ║  NAAb BOLO — scan.naab                                         ║
-# ║  Static Analysis Scanner — NAAb + C++ + Rust polyglot           ║
+# ║  Static Analysis Scanner — NAAb + C++ (via bolo stdlib)         ║
 # ╚══════════════════════════════════════════════════════════════════╝
 #
-# WHY C++:  std::regex compiles patterns once, scans at native speed.
+# WHY C++:  bolo.scan() calls the C++ GovernanceEngine internally.
+#           std::regex compiles patterns once, scans at native speed.
 #           50x faster than Python re module for bulk pattern matching.
-# WHY RUST: rayon gives zero-cost parallelism for file I/O.
-#           Reads 1000 files concurrently in milliseconds.
-# WHY NAAB: Orchestrates polyglot blocks, formats output, manages state.
+# WHY SHELL: find for portable file discovery.
+# WHY NAAB: Orchestrates scanning, formats output, manages state.
 
 main {
     let args = env.get_args()
