@@ -1,0 +1,24 @@
+{
+  "name": "security",
+  "description": "Security scanning: secrets, PII, injection, escalation, path traversal, exfiltration",
+  "checks": {
+    "code_quality": {
+      "no_secrets": true,
+      "no_pii": true,
+      "no_debug_code": true
+    },
+    "security": {
+      "no_sql_injection": true,
+      "no_shell_injection": true,
+      "no_privilege_escalation": true,
+      "no_path_traversal": true,
+      "no_exfiltration": true,
+      "no_information_disclosure": true,
+      "no_crypto_misuse": true
+    }
+  },
+  "thresholds": {
+    "max_critical_violations": 0,
+    "max_high_violations": 0
+  }
+}

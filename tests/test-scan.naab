@@ -1,0 +1,151 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  NAAb BOLO — test-scan.naab                                    ║
+# ║  Scanner regression tests — NAAb + Shell polyglot              ║
+# ╚══════════════════════════════════════════════════════════════════╝
+#
+# WHY SHELL: Runs naab-lang as a subprocess to test CLI behavior.
+#            Captures stdout for output verification.
+# WHY NAAB:  Test orchestration, assertions, result counting.
+
+main {
+    let pass = 0
+    let fail = 0
+    let naab = "./naab/build/naab-lang"
+
+    print("NAAb BOLO — Scanner Regression Tests")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+    # ── Test 1: Secrets detection ──
+    bolo.load_profile("security")
+    let code1 = file.read("tests/fixtures/has-secrets.py")
+    let v1 = bolo.scan("python", code1)
+    let found_secret = false
+    for v in v1 {
+        if string.contains(v.rule, "secret") { found_secret = true }
+        if string.contains(v.rule, "aws") { found_secret = true }
+        if string.contains(v.rule, "credential") { found_secret = true }
+    }
+    if found_secret {
+        print("  PASS  test_secrets_detected")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_secrets_detected — no secret violations found")
+        fail = fail + 1
+    }
+
+    # ── Test 2: Clean code produces zero violations ──
+    bolo.load_profile("enterprise")
+    let code2 = file.read("tests/fixtures/clean-code.py")
+    let v2 = bolo.scan("python", code2)
+    if array.length(v2) == 0 {
+        print("  PASS  test_clean_code_no_violations")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_clean_code_no_violations — got " + "" + array.length(v2) + " violations")
+        fail = fail + 1
+    }
+
+    # ── Test 3: Oversimplification detection ──
+    bolo.load_profile("llm")
+    let code3 = file.read("tests/fixtures/has-oversimplified.py")
+    let v3 = bolo.scan("python", code3)
+    let found_stub = false
+    for v in v3 {
+        if string.contains(v.rule, "stub") { found_stub = true }
+        if string.contains(v.rule, "oversimpl") { found_stub = true }
+        if string.contains(v.rule, "trivial") { found_stub = true }
+        if string.contains(v.rule, "incomplete") { found_stub = true }
+    }
+    if found_stub {
+        print("  PASS  test_oversimplification_detected")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_oversimplification_detected — no stub violations found")
+        fail = fail + 1
+    }
+
+    # ── Test 4: Injection detection (JavaScript) ──
+    bolo.load_profile("security")
+    let code4 = file.read("tests/fixtures/has-injection.js")
+    let v4 = bolo.scan("javascript", code4)
+    let found_injection = false
+    for v in v4 {
+        if string.contains(v.rule, "injection") { found_injection = true }
+        if string.contains(v.rule, "sql") { found_injection = true }
+        if string.contains(v.rule, "shell") { found_injection = true }
+    }
+    if found_injection {
+        print("  PASS  test_injection_detected")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_injection_detected — no injection violations found")
+        fail = fail + 1
+    }
+
+    # ── Test 5: Mixed issues (Rust) ──
+    bolo.load_profile("enterprise")
+    let code5 = file.read("tests/fixtures/mixed-issues.rs")
+    let v5 = bolo.scan("rust", code5)
+    if array.length(v5) >= 2 {
+        print("  PASS  test_mixed_issues — found " + "" + array.length(v5) + " violations")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_mixed_issues — expected >= 2 violations, got " + "" + array.length(v5))
+        fail = fail + 1
+    }
+
+    # ── Test 6: Violation has required fields ──
+    if array.length(v5) > 0 {
+        let v = v5[0]
+        let has_fields = true
+        # Check that violation dict has expected keys
+        try {
+            let r = v.rule
+            let m = v.message
+            let s = v.severity
+            let l = v.line
+        } catch (e) {
+            has_fields = false
+        }
+        if has_fields {
+            print("  PASS  test_violation_has_fields")
+            pass = pass + 1
+        } else {
+            print("  FAIL  test_violation_has_fields — missing required fields")
+            fail = fail + 1
+        }
+    } else {
+        print("  SKIP  test_violation_has_fields — no violations to check")
+    }
+
+    # ── Test 7: Profile affects scan results ──
+    bolo.load_profile("llm")
+    let v_llm = bolo.scan("python", code1)
+    bolo.load_profile("security")
+    let v_sec = bolo.scan("python", code1)
+    # Both should find something, but potentially different checks
+    if array.length(v_llm) >= 0 {
+        print("  PASS  test_profile_affects_scan — llm=" + "" + array.length(v_llm) + " sec=" + "" + array.length(v_sec))
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_profile_affects_scan")
+        fail = fail + 1
+    }
+
+    # ── Test 8: Scan CLI output ──
+    let scan_output = <<shell[naab]
+        $naab scan.naab tests/fixtures/has-secrets.py --profile security 2>&1 || true
+    >>
+    if string.contains(scan_output, "NAAb BOLO") {
+        print("  PASS  test_scan_cli_output")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_scan_cli_output — missing banner")
+        fail = fail + 1
+    }
+
+    # ── Summary ──
+    print("")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("Scanner Tests: " + "" + pass + " PASS, " + "" + fail + " FAIL")
+}

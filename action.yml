@@ -1,0 +1,86 @@
+name: 'NAAb BOLO'
+description: 'Enterprise LLM & AI governance scanner — 50+ checks via polyglot C++/Python/Rust'
+branding:
+  icon: 'shield'
+  color: 'blue'
+
+inputs:
+  path:
+    description: 'Path to scan'
+    required: false
+    default: '.'
+  profile:
+    description: 'Governance profile: enterprise | llm | security | ai-governance | standard'
+    required: false
+    default: 'enterprise'
+  format:
+    description: 'Report format: sarif | json | html | csv | junit'
+    required: false
+    default: 'sarif'
+  stage:
+    description: 'Enforcement stage: pre-commit | ci | pr-merge'
+    required: false
+    default: 'ci'
+  fail-on-violations:
+    description: 'Fail the action if violations are found'
+    required: false
+    default: 'true'
+
+outputs:
+  violations:
+    description: 'Number of violations found'
+  report-path:
+    description: 'Path to generated report file'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup NAAb
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        bash build.sh
+
+    - name: Run BOLO Scan
+      shell: bash
+      run: |
+        cd ${{ github.action_path }}
+        NAAB="./naab/build/naab-lang"
+        REPORT_FILE="${{ runner.temp }}/bolo-report.${{ inputs.format }}"
+
+        # Run scan
+        $NAAB scan.naab ${{ inputs.path }} --profile ${{ inputs.profile }} --format json 2>&1 | tee scan-output.txt
+
+        # Generate report
+        $NAAB report.naab ${{ inputs.path }} \
+          --format ${{ inputs.format }} \
+          --profile ${{ inputs.profile }} \
+          --output "$REPORT_FILE"
+
+        echo "report-path=$REPORT_FILE" >> $GITHUB_OUTPUT
+
+        # Count violations
+        VIOLATIONS=$(grep -c "FAIL\|violation" scan-output.txt || echo "0")
+        echo "violations=$VIOLATIONS" >> $GITHUB_OUTPUT
+
+        # Upload SARIF if applicable
+        if [ "${{ inputs.format }}" = "sarif" ]; then
+          echo "SARIF report generated at: $REPORT_FILE"
+        fi
+
+    - name: Upload SARIF
+      if: inputs.format == 'sarif' && always()
+      uses: github/codeql-action/upload-sarif@v3
+      with:
+        sarif_file: ${{ runner.temp }}/bolo-report.sarif
+      continue-on-error: true
+
+    - name: Check violations
+      if: inputs.fail-on-violations == 'true'
+      shell: bash
+      run: |
+        VIOLATIONS="${{ steps.scan.outputs.violations }}"
+        if [ "$VIOLATIONS" != "0" ] && [ -n "$VIOLATIONS" ]; then
+          echo "::error::NAAb BOLO found violations. See report for details."
+          exit 1
+        fi

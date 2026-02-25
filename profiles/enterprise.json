@@ -1,0 +1,56 @@
+{
+  "name": "enterprise",
+  "description": "Full enterprise governance: all LLM + security + AI + quality checks",
+  "checks": {
+    "llm_anti_drift": {
+      "oversimplification": true,
+      "incomplete_logic": true,
+      "hallucinated_apis": true
+    },
+    "code_quality": {
+      "no_secrets": true,
+      "no_pii": true,
+      "no_placeholders": true,
+      "no_dead_code": true,
+      "no_debug_code": true,
+      "no_mock_data": true,
+      "encoding_check": true,
+      "line_length": 120,
+      "function_length": 50,
+      "cyclomatic_complexity": 10,
+      "no_apologetic_language": true,
+      "no_hardcoded_success": true,
+      "no_code_blocks_in_comments": true,
+      "schema_validation": true,
+      "hash_integrity": true,
+      "yaml_validation": true,
+      "non_functional_check": true
+    },
+    "security": {
+      "no_sql_injection": true,
+      "no_shell_injection": true,
+      "no_privilege_escalation": true,
+      "no_path_traversal": true,
+      "no_exfiltration": true,
+      "no_information_disclosure": true,
+      "no_crypto_misuse": true
+    },
+    "ai_governance": {
+      "governance_config": true,
+      "model_attestation": true,
+      "rate_limiting": true,
+      "explainability": true
+    },
+    "enforcement": {
+      "gates": ["compilation", "import_resolution", "test_runner", "coverage", "lint", "security", "documentation"],
+      "validators": "all"
+    }
+  },
+  "thresholds": {
+    "coverage_minimum": 80,
+    "lint_minimum_score": 7.0,
+    "documentation_minimum": 60,
+    "max_critical_violations": 0,
+    "max_high_violations": 5
+  }
+}

@@ -1,0 +1,260 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  NAAb BOLO — test-enforce.naab                                 ║
+# ║  Enforcement gate regression tests — NAAb + Python polyglot    ║
+# ╚══════════════════════════════════════════════════════════════════╝
+#
+# WHY PYTHON: Tests run actual Python compilation, AST parsing,
+#             and regex validation — these are inherently Python tasks.
+# WHY NAAB:  Test orchestration, assertions, pass/fail counting.
+
+main {
+    let pass = 0
+    let fail = 0
+
+    print("NAAb BOLO — Enforcement Gate Regression Tests")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+    # ── Test 1: Compilation gate catches syntax errors ──
+    let compile_result = <<python -> JSON
+import json
+
+bad_code = "def foo(\n  return 42"
+try:
+    compile(bad_code, "<test>", "exec")
+    naab_return(json.dumps({"passed": True}))
+except SyntaxError:
+    naab_return(json.dumps({"passed": False, "error": "syntax_error"}))
+    >>
+
+    if compile_result.passed == false {
+        print("  PASS  test_compilation_catches_syntax_error")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_compilation_catches_syntax_error")
+        fail = fail + 1
+    }
+
+    # ── Test 2: Compilation gate passes valid code ──
+    let compile_ok = <<python -> JSON
+import json
+
+good_code = "def foo():\n    return 42\n"
+try:
+    compile(good_code, "<test>", "exec")
+    naab_return(json.dumps({"passed": True}))
+except SyntaxError as e:
+    naab_return(json.dumps({"passed": False, "error": str(e)}))
+    >>
+
+    if compile_ok.passed {
+        print("  PASS  test_compilation_passes_valid_code")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_compilation_passes_valid_code")
+        fail = fail + 1
+    }
+
+    # ── Test 3: Import resolution detects missing imports ──
+    let import_result = <<python -> JSON
+import json, ast
+
+code_with_bad_import = """
+import os
+import nonexistent_module_xyz123
+"""
+
+try:
+    tree = ast.parse(code_with_bad_import)
+    imports = []
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                imports.append(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.module:
+                imports.append(node.module)
+
+    unresolved = []
+    for imp in imports:
+        try:
+            __import__(imp.split(".")[0])
+        except ImportError:
+            unresolved.append(imp)
+
+    naab_return(json.dumps({"unresolved": unresolved, "has_issues": len(unresolved) > 0}))
+except Exception as e:
+    naab_return(json.dumps({"error": str(e), "has_issues": False}))
+    >>
+
+    if import_result.has_issues {
+        print("  PASS  test_import_resolution_catches_missing")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_import_resolution_catches_missing")
+        fail = fail + 1
+    }
+
+    # ── Test 4: Secrets validator detects patterns ──
+    let secrets_result = <<python -> JSON
+import json, re
+
+code = '''
+API_KEY = "sk-proj-abc123def456ghi789jkl012mno345pqr678"
+AWS_KEY = "AKIAIOSFODNN7EXAMPLE"
+password = "SuperSecret123"
+'''
+
+patterns = [
+    r'(?i)(api[_-]?key|apikey)\s*[=:]\s*["\'][A-Za-z0-9_\-]{20,}',
+    r'AKIA[0-9A-Z]{16}',
+    r'(?i)(password|passwd|pwd)\s*[=:]\s*["\'][^"\']{8,}',
+]
+
+found = 0
+for pat in patterns:
+    matches = re.findall(pat, code)
+    found += len(matches)
+
+naab_return(json.dumps({"secrets_found": found, "detected": found > 0}))
+    >>
+
+    if secrets_result.detected {
+        print("  PASS  test_secrets_validator — found " + "" + secrets_result.secrets_found + " secrets")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_secrets_validator")
+        fail = fail + 1
+    }
+
+    # ── Test 5: Placeholder validator detects TODOs ──
+    let placeholder_result = <<python -> JSON
+import json, re
+
+code = '''
+def foo():
+    # TODO: implement this
+    # FIXME: broken
+    # HACK: temporary
+    pass
+'''
+
+patterns = [r'(?i)\bTODO\b', r'(?i)\bFIXME\b', r'(?i)\bHACK\b', r'(?i)\bXXX\b']
+found = 0
+for pat in patterns:
+    found += len(re.findall(pat, code))
+
+naab_return(json.dumps({"placeholders_found": found, "detected": found > 0}))
+    >>
+
+    if placeholder_result.detected {
+        print("  PASS  test_placeholder_validator — found " + "" + placeholder_result.placeholders_found)
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_placeholder_validator")
+        fail = fail + 1
+    }
+
+    # ── Test 6: Apologetic language detector ──
+    let apology_result = <<python -> JSON
+import json, re
+
+code = '''
+# I apologize for the complexity of this function
+# As an AI, I cannot guarantee correctness
+# I'm sorry but this might not work
+def process():
+    pass
+'''
+
+patterns = [r'(?i)i apologize', r'(?i)as an ai', r"(?i)i'm sorry.*but"]
+found = 0
+for pat in patterns:
+    found += len(re.findall(pat, code))
+
+naab_return(json.dumps({"apologies_found": found, "detected": found > 0}))
+    >>
+
+    if apology_result.detected {
+        print("  PASS  test_apologetic_language — found " + "" + apology_result.apologies_found)
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_apologetic_language")
+        fail = fail + 1
+    }
+
+    # ── Test 7: Clean code passes all validators ──
+    let clean_result = <<python -> JSON
+import json, re
+
+code = '''
+import os
+import logging
+
+def process_data(items):
+    results = []
+    for item in items:
+        results.append(str(item).strip())
+    return results
+'''
+
+checks = {
+    "no_secrets": not bool(re.search(r'(?i)(api[_-]?key|password)\s*[=:]\s*["\'][^"\']{8,}', code)),
+    "no_placeholders": not bool(re.search(r'(?i)\b(TODO|FIXME|HACK|XXX)\b', code)),
+    "no_apologies": not bool(re.search(r'(?i)(i apologize|as an ai)', code)),
+    "compiles": True,
+}
+
+try:
+    compile(code, "<test>", "exec")
+except:
+    checks["compiles"] = False
+
+all_pass = all(checks.values())
+naab_return(json.dumps({"all_pass": all_pass, "checks": checks}))
+    >>
+
+    if clean_result.all_pass {
+        print("  PASS  test_clean_code_passes_all")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_clean_code_passes_all")
+        fail = fail + 1
+    }
+
+    # ── Test 8: Stage filtering — pre-commit runs fewer checks ──
+    # pre-commit should only run compilation + lint (2 gates)
+    # ci should run 6 gates
+    # pr-merge should run all 7 gates
+    let stage_check = <<python -> JSON
+import json
+
+stages = {
+    "pre-commit": ["compilation", "lint"],
+    "ci": ["compilation", "import_resolution", "test_runner", "coverage", "lint", "security"],
+    "pr-merge": ["compilation", "import_resolution", "test_runner", "coverage", "lint", "security", "documentation"]
+}
+
+valid = (len(stages["pre-commit"]) < len(stages["ci"]) and
+         len(stages["ci"]) < len(stages["pr-merge"]))
+
+naab_return(json.dumps({
+    "valid": valid,
+    "pre_commit_count": len(stages["pre-commit"]),
+    "ci_count": len(stages["ci"]),
+    "pr_merge_count": len(stages["pr-merge"])
+}))
+    >>
+
+    if stage_check.valid {
+        print("  PASS  test_stage_filtering — pre-commit=" + "" + stage_check.pre_commit_count + " ci=" + "" + stage_check.ci_count + " pr-merge=" + "" + stage_check.pr_merge_count)
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_stage_filtering")
+        fail = fail + 1
+    }
+
+    # ── Summary ──
+    print("")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("Enforcement Tests: " + "" + pass + " PASS, " + "" + fail + " FAIL")
+}

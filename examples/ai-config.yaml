@@ -1,0 +1,54 @@
+# Example: AI governance configuration for NAAb BOLO ai-check
+# This file demonstrates a compliant AI governance config
+
+version: "1.0"
+
+model_policies:
+  gpt-4:
+    allowed_uses:
+      - "text summarization"
+      - "code review assistance"
+      - "documentation generation"
+    prohibited_uses:
+      - "autonomous decision making"
+      - "personal data processing without consent"
+    max_tokens: 4096
+    temperature_range: [0.0, 1.0]
+
+  claude-3:
+    allowed_uses:
+      - "code generation"
+      - "analysis"
+    prohibited_uses:
+      - "medical diagnosis"
+      - "legal advice"
+
+guardrails:
+  input_validation:
+    max_input_length: 10000
+    blocked_patterns:
+      - "ignore previous instructions"
+      - "system prompt"
+    content_filtering: true
+
+  output_filtering:
+    pii_detection: true
+    toxicity_threshold: 0.8
+    hallucination_detection: true
+
+  rate_limiting:
+    requests_per_minute: 60
+    tokens_per_minute: 100000
+    concurrent_requests: 10
+
+logging:
+  inference_logging: true
+  audit_trail: true
+  retention_days: 90
+
+explainability:
+  required_for_production: true
+  tools:
+    - "shap"
+    - "lime"
+  minimum_coverage: 80

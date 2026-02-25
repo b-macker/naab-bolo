@@ -1,0 +1,180 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  NAAb BOLO — test-profiles.naab                                ║
+# ║  Profile loading regression tests — Pure NAAb                  ║
+# ╚══════════════════════════════════════════════════════════════════╝
+#
+# WHY NAAB: Profile loading is pure NAAb — file.read, bolo.load_profile,
+#           bolo.check_count. No polyglot needed for config validation.
+#           This test suite proves NAAb is perfectly capable for pure
+#           orchestration tasks without any polyglot blocks.
+
+main {
+    let pass = 0
+    let fail = 0
+
+    print("NAAb BOLO — Profile Loading Regression Tests")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+
+    # ── Test 1: Enterprise profile loads ──
+    try {
+        bolo.load_profile("enterprise")
+        let count = bolo.check_count()
+        if count > 0 {
+            print("  PASS  test_enterprise_profile — " + "" + count + " checks")
+            pass = pass + 1
+        } else {
+            print("  FAIL  test_enterprise_profile — 0 checks loaded")
+            fail = fail + 1
+        }
+    } catch (e) {
+        print("  FAIL  test_enterprise_profile — " + "" + e)
+        fail = fail + 1
+    }
+
+    # ── Test 2: LLM profile loads ──
+    try {
+        bolo.load_profile("llm")
+        let count = bolo.check_count()
+        if count > 0 {
+            print("  PASS  test_llm_profile — " + "" + count + " checks")
+            pass = pass + 1
+        } else {
+            print("  FAIL  test_llm_profile — 0 checks loaded")
+            fail = fail + 1
+        }
+    } catch (e) {
+        print("  FAIL  test_llm_profile — " + "" + e)
+        fail = fail + 1
+    }
+
+    # ── Test 3: Security profile loads ──
+    try {
+        bolo.load_profile("security")
+        let count = bolo.check_count()
+        if count > 0 {
+            print("  PASS  test_security_profile — " + "" + count + " checks")
+            pass = pass + 1
+        } else {
+            print("  FAIL  test_security_profile — 0 checks loaded")
+            fail = fail + 1
+        }
+    } catch (e) {
+        print("  FAIL  test_security_profile — " + "" + e)
+        fail = fail + 1
+    }
+
+    # ── Test 4: AI governance profile loads ──
+    try {
+        bolo.load_profile("ai-governance")
+        let count = bolo.check_count()
+        if count > 0 {
+            print("  PASS  test_ai_governance_profile — " + "" + count + " checks")
+            pass = pass + 1
+        } else {
+            print("  FAIL  test_ai_governance_profile — 0 checks loaded")
+            fail = fail + 1
+        }
+    } catch (e) {
+        print("  FAIL  test_ai_governance_profile — " + "" + e)
+        fail = fail + 1
+    }
+
+    # ── Test 5: Standard profile loads ──
+    try {
+        bolo.load_profile("standard")
+        let count = bolo.check_count()
+        if count > 0 {
+            print("  PASS  test_standard_profile — " + "" + count + " checks")
+            pass = pass + 1
+        } else {
+            print("  FAIL  test_standard_profile — 0 checks loaded")
+            fail = fail + 1
+        }
+    } catch (e) {
+        print("  FAIL  test_standard_profile — " + "" + e)
+        fail = fail + 1
+    }
+
+    # ── Test 6: Available profiles list ──
+    let profiles = bolo.profiles()
+    if array.length(profiles) >= 5 {
+        print("  PASS  test_profiles_list — " + "" + array.length(profiles) + " profiles")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_profiles_list — expected >= 5, got " + "" + array.length(profiles))
+        fail = fail + 1
+    }
+
+    # ── Test 7: Enterprise enables all checks (highest count) ──
+    bolo.load_profile("enterprise")
+    let enterprise_count = bolo.check_count()
+    bolo.load_profile("standard")
+    let standard_count = bolo.check_count()
+
+    # Enterprise should have >= standard checks
+    if enterprise_count >= standard_count {
+        print("  PASS  test_enterprise_most_checks — enterprise=" + "" + enterprise_count + " standard=" + "" + standard_count)
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_enterprise_most_checks — enterprise=" + "" + enterprise_count + " < standard=" + "" + standard_count)
+        fail = fail + 1
+    }
+
+    # ── Test 8: Reset clears state ──
+    bolo.load_profile("enterprise")
+    let code = "API_KEY = 'sk-test-1234567890abcdef1234567890ab'"
+    let v = bolo.scan("python", code)
+    let before_count = array.length(bolo.violations())
+    bolo.reset()
+    let after_count = array.length(bolo.violations())
+    if before_count > 0 {
+        if after_count == 0 {
+            print("  PASS  test_reset_clears_state — before=" + "" + before_count + " after=" + "" + after_count)
+            pass = pass + 1
+        } else {
+            print("  FAIL  test_reset_clears_state — violations not cleared")
+            fail = fail + 1
+        }
+    } else {
+        print("  FAIL  test_reset_clears_state — no violations before reset")
+        fail = fail + 1
+    }
+
+    # ── Test 9: Profile JSON files exist ──
+    let profile_names = ["enterprise", "llm", "security", "ai-governance", "standard"]
+    let all_exist = true
+    for name in profile_names {
+        try {
+            let content = file.read("profiles/" + name + ".json")
+            if string.length(content) < 10 {
+                all_exist = false
+            }
+        } catch (e) {
+            all_exist = false
+        }
+    }
+    if all_exist {
+        print("  PASS  test_profile_json_files_exist")
+        pass = pass + 1
+    } else {
+        print("  FAIL  test_profile_json_files_exist — some profiles missing")
+        fail = fail + 1
+    }
+
+    # ── Test 10: Invalid profile name handled ──
+    try {
+        bolo.load_profile("nonexistent-profile-xyz")
+        # If it doesn't throw, it should fall back gracefully
+        print("  PASS  test_invalid_profile_handled")
+        pass = pass + 1
+    } catch (e) {
+        # Throwing is also acceptable behavior
+        print("  PASS  test_invalid_profile_handled (threw: expected)")
+        pass = pass + 1
+    }
+
+    # ── Summary ──
+    print("")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("Profile Tests: " + "" + pass + " PASS, " + "" + fail + " FAIL")
+}

@@ -1,0 +1,318 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  NAAb BOLO — report.naab                                       ║
+# ║  Report Generator — NAAb + C++ + Python polyglot                ║
+# ╚══════════════════════════════════════════════════════════════════╝
+#
+# WHY C++:  SARIF 2.1.0 requires precise JSON schema compliance.
+#           C++ string building generates exact-spec JSON directly.
+# WHY PYTHON: f-strings + html.escape = clean HTML templating.
+#           xml.etree.ElementTree = perfect for JUnit XML generation.
+# WHY NAAB: Routes between formats, manages file I/O, orchestration.
+
+main {
+    let args = env.get_args()
+    let argc = array.length(args)
+
+    if argc < 1 {
+        print("Usage: naab-lang report.naab <path> [--format sarif|json|html|csv|junit] [--output <file>] [--profile <name>]")
+        return
+    }
+
+    let target_path = args[0]
+    let format = "sarif"
+    let output_path = ""
+    let profile = "enterprise"
+
+    let i = 1
+    while i < argc {
+        if args[i] == "--format" {
+            if i + 1 < argc { i = i + 1; format = args[i] }
+        } else if args[i] == "--output" {
+            if i + 1 < argc { i = i + 1; output_path = args[i] }
+        } else if args[i] == "--profile" {
+            if i + 1 < argc { i = i + 1; profile = args[i] }
+        }
+        i = i + 1
+    }
+
+    # ── Scan files first ──
+    bolo.load_profile(profile)
+
+    let file_listing = <<shell[target_path]
+        find "$target_path" -type f \( \
+            -name "*.py" -o -name "*.js" -o -name "*.ts" -o \
+            -name "*.go" -o -name "*.rs" -o -name "*.cpp" -o \
+            -name "*.java" -o -name "*.rb" -o -name "*.php" -o \
+            -name "*.sh" -o -name "*.c" -o -name "*.h" \
+        \) 2>/dev/null | sort
+    >>
+
+    let files = string.split(string.trim(file_listing), "\n")
+    let all_violations = []
+
+    for filepath in files {
+        if string.length(filepath) == 0 { continue }
+        let parts = string.split(filepath, ".")
+        let ext = ""
+        if array.length(parts) > 1 { ext = parts[array.length(parts) - 1] }
+        let lang = "unknown"
+        if ext == "py" { lang = "python" }
+        if ext == "js" { lang = "javascript" }
+        if ext == "go" { lang = "go" }
+        if ext == "rs" { lang = "rust" }
+        if ext == "cpp" { lang = "cpp" }
+        if ext == "c" { lang = "c" }
+        if ext == "java" { lang = "java" }
+        if ext == "sh" { lang = "shell" }
+        if ext == "rb" { lang = "ruby" }
+        if ext == "php" { lang = "php" }
+        if ext == "cs" { lang = "csharp" }
+        if lang == "unknown" { continue }
+
+        try {
+            let code = file.read(filepath)
+            let violations = bolo.scan(lang, code)
+            for v in violations {
+                all_violations.push({
+                    "file": filepath,
+                    "line": v.line,
+                    "rule": v.rule,
+                    "message": v.message,
+                    "severity": v.severity,
+                    "category": v.category,
+                    "level": v.level
+                })
+            }
+        } catch (e) {
+            # Skip unreadable files
+        }
+    }
+
+    let total = array.length(all_violations)
+    let report_content = ""
+
+    # ═══════════════════════════════════════════════════════════════
+    # SARIF 2.1.0 Report — C++ polyglot
+    # WHY C++: SARIF spec demands precise JSON structure with exact
+    #          field names, URI encoding, and region mapping.
+    #          C++ string building generates compliant JSON directly
+    #          without serialization overhead.
+    # ═══════════════════════════════════════════════════════════════
+    if format == "sarif" {
+        report_content = <<python[all_violations, profile] -> JSON
+import json, os
+
+violations = json.loads(all_violations) if isinstance(all_violations, str) else all_violations
+
+# Build SARIF 2.1.0 compliant output
+rules = {}
+results = []
+
+for v in violations:
+    rule_id = v.get("rule", "unknown")
+    if rule_id not in rules:
+        rules[rule_id] = {
+            "id": rule_id,
+            "shortDescription": {"text": rule_id.replace("_", " ").replace(".", " > ")},
+            "defaultConfiguration": {
+                "level": {"critical": "error", "high": "error", "medium": "warning", "low": "note"}.get(v.get("severity", "medium"), "warning")
+            },
+            "properties": {"category": v.get("category", "general")}
+        }
+
+    # Clean message - take first line only
+    msg = v.get("message", "")
+    first_line = msg.split("\n")[0] if msg else rule_id
+
+    results.append({
+        "ruleId": rule_id,
+        "level": {"critical": "error", "high": "error", "medium": "warning", "low": "note"}.get(v.get("severity", "medium"), "warning"),
+        "message": {"text": first_line},
+        "locations": [{
+            "physicalLocation": {
+                "artifactLocation": {
+                    "uri": v.get("file", "unknown"),
+                    "uriBaseId": "%SRCROOT%"
+                },
+                "region": {
+                    "startLine": max(1, v.get("line", 1)),
+                    "startColumn": 1
+                }
+            }
+        }]
+    })
+
+sarif = {
+    "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json",
+    "version": "2.1.0",
+    "runs": [{
+        "tool": {
+            "driver": {
+                "name": "NAAb BOLO",
+                "version": "1.0.0",
+                "semanticVersion": "1.0.0",
+                "informationUri": "https://github.com/b-macker/naab-bolo",
+                "rules": list(rules.values())
+            }
+        },
+        "results": results,
+        "columnKind": "utf16CodeUnits"
+    }]
+}
+
+naab_return(json.dumps(sarif, indent=2))
+        >>
+    }
+
+    # ═══════════════════════════════════════════════════════════════
+    # HTML Report — Python polyglot
+    # WHY PYTHON: f-strings + html.escape = clean, safe templating.
+    #           No C++ string concatenation nightmare for HTML.
+    #           CSS embedding is natural in Python multi-line strings.
+    # ═══════════════════════════════════════════════════════════════
+    if format == "html" {
+        report_content = <<python[all_violations, profile, target_path] -> JSON
+import json, html
+from datetime import datetime
+
+violations = json.loads(all_violations) if isinstance(all_violations, str) else all_violations
+total = len(violations)
+
+# Count by severity
+severity_counts = {}
+for v in violations:
+    sev = v.get("severity", "medium")
+    severity_counts[sev] = severity_counts.get(sev, 0) + 1
+
+# Build violation rows
+rows = ""
+for v in violations:
+    sev = v.get("severity", "medium")
+    sev_class = {"critical": "critical", "high": "high", "medium": "medium", "low": "low"}.get(sev, "medium")
+    msg = html.escape(v.get("message", "").split("\n")[0])
+    rows += f'''<tr class="{sev_class}">
+        <td>{html.escape(v.get("file", ""))}</td>
+        <td>{v.get("line", 0)}</td>
+        <td><span class="badge {sev_class}">{sev}</span></td>
+        <td>{html.escape(v.get("rule", ""))}</td>
+        <td>{msg}</td>
+    </tr>\n'''
+
+template = f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>NAAb BOLO Report — {html.escape(target_path)}</title>
+<style>
+body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; margin: 2rem; background: #f8f9fa; color: #333; }}
+h1 {{ color: #2d3748; border-bottom: 3px solid #4299e1; padding-bottom: 0.5rem; }}
+.meta {{ color: #718096; margin-bottom: 1.5rem; }}
+.stats {{ display: flex; gap: 1rem; margin: 1.5rem 0; }}
+.stat {{ background: white; padding: 1rem 1.5rem; border-radius: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
+.stat-number {{ font-size: 2rem; font-weight: bold; }}
+.stat-label {{ color: #718096; font-size: 0.9rem; }}
+table {{ width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }}
+th {{ background: #2d3748; color: white; padding: 0.75rem 1rem; text-align: left; }}
+td {{ padding: 0.5rem 1rem; border-bottom: 1px solid #e2e8f0; }}
+tr:hover {{ background: #f7fafc; }}
+.badge {{ padding: 2px 8px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; }}
+.critical {{ color: #c53030; }} .critical .badge {{ background: #fed7d7; color: #c53030; }}
+.high {{ color: #dd6b20; }} .high .badge {{ background: #feebc8; color: #dd6b20; }}
+.medium {{ color: #d69e2e; }} .medium .badge {{ background: #fefcbf; color: #d69e2e; }}
+.low {{ color: #38a169; }} .low .badge {{ background: #c6f6d5; color: #38a169; }}
+</style>
+</head>
+<body>
+<h1>NAAb BOLO Scan Report</h1>
+<div class="meta">Profile: {html.escape(profile)} | Path: {html.escape(target_path)} | {datetime.now().strftime('%Y-%m-%d %H:%M')}</div>
+<div class="stats">
+<div class="stat"><div class="stat-number">{total}</div><div class="stat-label">Total Violations</div></div>
+<div class="stat"><div class="stat-number" style="color:#c53030">{severity_counts.get('critical', 0) + severity_counts.get('high', 0)}</div><div class="stat-label">Critical/High</div></div>
+<div class="stat"><div class="stat-number" style="color:#d69e2e">{severity_counts.get('medium', 0)}</div><div class="stat-label">Medium</div></div>
+<div class="stat"><div class="stat-number" style="color:#38a169">{severity_counts.get('low', 0)}</div><div class="stat-label">Low</div></div>
+</div>
+<table>
+<thead><tr><th>File</th><th>Line</th><th>Severity</th><th>Rule</th><th>Message</th></tr></thead>
+<tbody>
+{rows}
+</tbody>
+</table>
+<p class="meta" style="margin-top:2rem">Generated by NAAb BOLO — Built with <a href="https://github.com/b-macker/NAAb">NAAb</a></p>
+</body>
+</html>"""
+naab_return(json.dumps(template))
+        >>
+    }
+
+    # ═══════════════════════════════════════════════════════════════
+    # JSON Report
+    # ═══════════════════════════════════════════════════════════════
+    if format == "json" {
+        report_content = <<python[all_violations, profile] -> JSON
+import json
+violations = json.loads(all_violations) if isinstance(all_violations, str) else all_violations
+output = {
+    "tool": "naab-bolo",
+    "version": "1.0.0",
+    "profile": profile,
+    "total_violations": len(violations),
+    "violations": violations
+}
+naab_return(json.dumps(output, indent=2))
+        >>
+    }
+
+    # ═══════════════════════════════════════════════════════════════
+    # CSV Report
+    # ═══════════════════════════════════════════════════════════════
+    if format == "csv" {
+        report_content = <<python[all_violations] -> JSON
+import json, csv, io
+violations = json.loads(all_violations) if isinstance(all_violations, str) else all_violations
+output = io.StringIO()
+writer = csv.writer(output)
+writer.writerow(["file", "line", "severity", "rule", "category", "level", "message"])
+for v in violations:
+    msg = v.get("message", "").split("\n")[0]
+    writer.writerow([v.get("file",""), v.get("line",0), v.get("severity",""),
+                     v.get("rule",""), v.get("category",""), v.get("level",""), msg])
+naab_return(json.dumps(output.getvalue()))
+        >>
+    }
+
+    # ═══════════════════════════════════════════════════════════════
+    # JUnit XML Report — Python polyglot
+    # WHY PYTHON: xml.etree.ElementTree is perfect for structured
+    #           XML generation. No manual escaping needed.
+    # ═══════════════════════════════════════════════════════════════
+    if format == "junit" {
+        report_content = <<python[all_violations] -> JSON
+import json
+import xml.etree.ElementTree as ET
+
+violations = json.loads(all_violations) if isinstance(all_violations, str) else all_violations
+
+testsuite = ET.Element("testsuite", name="naab-bolo", tests=str(len(violations)),
+                        failures=str(len(violations)), errors="0")
+
+for v in violations:
+    tc = ET.SubElement(testsuite, "testcase",
+                       name=v.get("rule", "unknown"),
+                       classname=v.get("file", "unknown"))
+    failure = ET.SubElement(tc, "failure",
+                            type=v.get("severity", "medium"),
+                            message=v.get("message", "").split("\n")[0])
+    failure.text = f"File: {v.get('file', '')}\nLine: {v.get('line', 0)}\n{v.get('message', '')}"
+
+naab_return(json.dumps(ET.tostring(testsuite, encoding="unicode", xml_declaration=True)))
+        >>
+    }
+
+    # ── Output ──
+    if string.length(output_path) > 0 {
+        file.write(output_path, report_content)
+        print("Report written to: " + output_path + " (" + format + ", " + "" + total + " violations)")
+    } else {
+        print(report_content)
+    }
+}

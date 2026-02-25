@@ -1,0 +1,470 @@
+# ╔══════════════════════════════════════════════════════════════════╗
+# ║  NAAb BOLO — ai-check.naab                                     ║
+# ║  AI Governance Validator — NAAb + Python polyglot               ║
+# ╚══════════════════════════════════════════════════════════════════╝
+#
+# WHY PYTHON: AI/ML ecosystem is Python-native. Model metadata files
+#             (ONNX, PyTorch, TF) are all Python-parseable.
+#             YAML config validation needs pyyaml. JSON Schema needs
+#             jsonschema. These are Python packages, period.
+# WHY NAAB:  CLI parsing, output formatting, orchestration between
+#             the 4 AI governance validators. Clean flow control.
+
+main {
+    let args = env.get_args()
+    let argc = array.length(args)
+
+    if argc < 1 {
+        print("Usage: naab-lang ai-check.naab <path> [--profile <name>] [--output <file>]")
+        print("")
+        print("AI Governance Validators:")
+        print("  1. Governance Config  — Checks for ai-config.yaml with required sections")
+        print("  2. Model Attestation  — Verifies model lineage, signatures, preprocessing")
+        print("  3. Rate Limiting      — Ensures inference endpoints have rate limits")
+        print("  4. Explainability     — Checks for explainability artifacts (SHAP, LIME)")
+        return
+    }
+
+    let target_path = args[0]
+    let profile = "ai-governance"
+    let output_path = ""
+
+    let i = 1
+    while i < argc {
+        if args[i] == "--profile" {
+            if i + 1 < argc { i = i + 1; profile = args[i] }
+        } else if args[i] == "--output" {
+            if i + 1 < argc { i = i + 1; output_path = args[i] }
+        }
+        i = i + 1
+    }
+
+    print("NAAb BOLO — AI Governance Check [" + profile + "]")
+    print("Target: " + target_path)
+    print("")
+
+    # ═══════════════════════════════════════════════════════════════
+    # AI Governance Validation — Python polyglot
+    # WHY PYTHON: yaml.safe_load for config parsing, pathlib for file
+    #             discovery, hashlib for model attestation checksums,
+    #             json for structured results. The AI/ML ecosystem
+    #             speaks Python — config formats, model metadata,
+    #             and governance specs are all Python-first.
+    # ═══════════════════════════════════════════════════════════════
+    let ai_results = <<python[target_path, profile] -> JSON
+import json, os, hashlib, re
+from pathlib import Path
+
+results = {"validators": [], "compliance_score": 0, "profile": profile}
+
+# ═════════════════════════════════════════════════════════
+# VALIDATOR 1: AI Governance Config
+# Checks for ai-config.yaml with required policy sections
+# ═════════════════════════════════════════════════════════
+def check_ai_governance_config(path):
+    config_files = list(Path(path).rglob("ai-config.yaml")) + list(Path(path).rglob("ai-config.yml"))
+    if not config_files:
+        return {
+            "validator": "ai_governance_config",
+            "passed": False,
+            "severity": "critical",
+            "message": "No ai-config.yaml found. AI governance configuration is required for compliance.",
+            "details": []
+        }
+
+    issues = []
+    for cf in config_files:
+        try:
+            import yaml
+            config = yaml.safe_load(open(cf))
+        except ImportError:
+            # Fallback: parse as JSON if yaml not available
+            try:
+                config = json.loads(open(cf).read())
+            except:
+                issues.append(f"Cannot parse {cf} (install pyyaml for YAML support)")
+                continue
+        except Exception as e:
+            issues.append(f"Invalid YAML in {cf}: {e}")
+            continue
+
+        if not isinstance(config, dict):
+            issues.append(f"{cf}: Config must be a YAML mapping, got {type(config).__name__}")
+            continue
+
+        # Required top-level sections
+        required = ["model_policies", "guardrails", "version"]
+        missing = [r for r in required if r not in config]
+        if missing:
+            issues.append(f"{cf}: Missing required sections: {', '.join(missing)}")
+
+        # Validate guardrails structure if present
+        if "guardrails" in config:
+            gr = config["guardrails"]
+            if isinstance(gr, dict):
+                recommended = ["input_validation", "output_filtering", "rate_limiting"]
+                missing_gr = [r for r in recommended if r not in gr]
+                if missing_gr:
+                    issues.append(f"{cf}: Guardrails missing recommended sections: {', '.join(missing_gr)}")
+
+        # Validate model_policies structure if present
+        if "model_policies" in config:
+            mp = config["model_policies"]
+            if isinstance(mp, dict):
+                for model_name, policy in mp.items():
+                    if isinstance(policy, dict):
+                        if "allowed_uses" not in policy and "prohibited_uses" not in policy:
+                            issues.append(f"{cf}: model_policies.{model_name} should define allowed_uses or prohibited_uses")
+            elif isinstance(mp, list):
+                for item in mp:
+                    if isinstance(item, dict) and "name" not in item:
+                        issues.append(f"{cf}: model_policies list items should have 'name' field")
+
+    return {
+        "validator": "ai_governance_config",
+        "passed": len(issues) == 0,
+        "severity": "critical" if len(issues) > 0 else "info",
+        "message": "AI governance config validated" if not issues else f"{len(issues)} config issue(s) found",
+        "details": issues
+    }
+
+# ═════════════════════════════════════════════════════════
+# VALIDATOR 2: Model Attestation
+# Verifies model lineage, signatures, preprocessing docs
+# ═════════════════════════════════════════════════════════
+def check_model_attestation(path):
+    issues = []
+
+    # Look for model attestation files
+    attestation_patterns = [
+        "model-attestation.json", "model-attestation.yaml",
+        "model_attestation.json", "model_attestation.yaml",
+        "model-card.json", "model-card.yaml", "model-card.md",
+        "MODEL_CARD.md"
+    ]
+    attestation_files = []
+    for pattern in attestation_patterns:
+        attestation_files.extend(list(Path(path).rglob(pattern)))
+
+    # Look for model files that NEED attestation
+    model_extensions = [".onnx", ".pt", ".pth", ".h5", ".keras", ".pb",
+                        ".tflite", ".pkl", ".joblib", ".safetensors"]
+    model_files = []
+    for ext in model_extensions:
+        model_files.extend(list(Path(path).rglob(f"*{ext}")))
+
+    if model_files and not attestation_files:
+        issues.append(f"Found {len(model_files)} model file(s) but no attestation/model card")
+        for mf in model_files[:5]:
+            issues.append(f"  Model without attestation: {mf}")
+
+    # Validate attestation content
+    for af in attestation_files:
+        try:
+            if str(af).endswith(".json"):
+                data = json.loads(open(af).read())
+            elif str(af).endswith((".yaml", ".yml")):
+                try:
+                    import yaml
+                    data = yaml.safe_load(open(af))
+                except ImportError:
+                    issues.append(f"{af}: Install pyyaml for YAML attestation parsing")
+                    continue
+            elif str(af).endswith(".md"):
+                content = open(af).read()
+                # Check for required markdown sections
+                required_headers = ["training data", "intended use", "limitations"]
+                found = [h for h in required_headers if h.lower() in content.lower()]
+                missing = [h for h in required_headers if h.lower() not in content.lower()]
+                if missing:
+                    issues.append(f"{af}: Missing sections: {', '.join(missing)}")
+                continue
+            else:
+                continue
+
+            if isinstance(data, dict):
+                # Check required attestation fields
+                required_fields = ["data_lineage", "preprocessing_steps"]
+                recommended_fields = ["model_version", "training_date", "evaluation_metrics"]
+
+                missing_req = [f for f in required_fields if f not in data]
+                if missing_req:
+                    issues.append(f"{af}: Missing required fields: {', '.join(missing_req)}")
+
+                missing_rec = [f for f in recommended_fields if f not in data]
+                if missing_rec:
+                    issues.append(f"{af}: Missing recommended fields: {', '.join(missing_rec)}")
+
+                # Verify data lineage has source info
+                if "data_lineage" in data:
+                    dl = data["data_lineage"]
+                    if isinstance(dl, dict) and "sources" not in dl:
+                        issues.append(f"{af}: data_lineage should include 'sources'")
+                    elif isinstance(dl, list) and len(dl) == 0:
+                        issues.append(f"{af}: data_lineage is empty")
+
+        except Exception as e:
+            issues.append(f"Error parsing {af}: {e}")
+
+    passed = len(issues) == 0
+    if not model_files and not attestation_files:
+        return {
+            "validator": "model_attestation",
+            "passed": True,
+            "severity": "info",
+            "message": "No model files found (attestation N/A)",
+            "details": []
+        }
+
+    return {
+        "validator": "model_attestation",
+        "passed": passed,
+        "severity": "high" if not passed else "info",
+        "message": "Model attestation verified" if passed else f"{len(issues)} attestation issue(s)",
+        "details": issues
+    }
+
+# ═════════════════════════════════════════════════════════
+# VALIDATOR 3: Rate Limiting
+# Ensures inference endpoints have rate limits defined
+# ═════════════════════════════════════════════════════════
+def check_rate_limiting(path):
+    issues = []
+
+    # Scan source files for inference endpoint patterns WITHOUT rate limiting
+    inference_patterns = [
+        r"@app\.(post|get)\s*\(\s*['\"].*(?:predict|inference|generate|complete)",
+        r"def\s+(?:predict|inference|generate|complete|forward)\s*\(",
+        r"model\.predict\s*\(",
+        r"pipeline\s*\(\s*['\"]",
+        r"openai\.\w+\.create\s*\(",
+        r"anthropic\.\w+\.create\s*\(",
+    ]
+
+    rate_limit_patterns = [
+        r"rate_limit", r"ratelimit", r"throttle", r"RateLimiter",
+        r"slowapi", r"flask_limiter", r"@limiter", r"token_bucket",
+        r"requests_per_minute", r"max_requests", r"quota",
+    ]
+
+    source_files = list(Path(path).rglob("*.py")) + list(Path(path).rglob("*.js")) + list(Path(path).rglob("*.ts"))
+
+    files_with_inference = []
+    files_with_rate_limits = set()
+
+    for sf in source_files:
+        try:
+            content = open(sf).read()
+        except:
+            continue
+
+        has_inference = any(re.search(p, content) for p in inference_patterns)
+        has_rate_limit = any(re.search(p, content, re.IGNORECASE) for p in rate_limit_patterns)
+
+        if has_inference:
+            files_with_inference.append(str(sf))
+            if has_rate_limit:
+                files_with_rate_limits.add(str(sf))
+
+    # Check config files for rate limiting
+    config_files = list(Path(path).rglob("ai-config.yaml")) + list(Path(path).rglob("ai-config.yml"))
+    config_has_rate_limits = False
+    for cf in config_files:
+        try:
+            content = open(cf).read()
+            if any(re.search(p, content, re.IGNORECASE) for p in rate_limit_patterns):
+                config_has_rate_limits = True
+        except:
+            pass
+
+    unprotected = [f for f in files_with_inference if f not in files_with_rate_limits]
+    if unprotected and not config_has_rate_limits:
+        for f in unprotected[:5]:
+            issues.append(f"Inference endpoint without rate limiting: {f}")
+
+    passed = len(issues) == 0
+    if not files_with_inference:
+        return {
+            "validator": "rate_limiting",
+            "passed": True,
+            "severity": "info",
+            "message": "No inference endpoints found (rate limiting N/A)",
+            "details": []
+        }
+
+    return {
+        "validator": "rate_limiting",
+        "passed": passed,
+        "severity": "high" if not passed else "info",
+        "message": "Rate limiting verified" if passed else f"{len(unprotected)} unprotected endpoint(s)",
+        "details": issues
+    }
+
+# ═════════════════════════════════════════════════════════
+# VALIDATOR 4: Explainability Artifacts
+# Checks for explainability tooling (SHAP, LIME, etc.)
+# ═════════════════════════════════════════════════════════
+def check_explainability(path):
+    issues = []
+
+    explainability_patterns = [
+        r"shap\.", r"lime\.", r"eli5\.", r"captum\.",
+        r"IntegratedGradients", r"GradientShap", r"DeepLift",
+        r"feature_importance", r"explain\s*\(", r"Explainer\s*\(",
+        r"shap_values", r"lime_explanation",
+    ]
+
+    explainability_files = [
+        "explainability.py", "explain.py", "interpretability.py",
+        "feature_importance.py", "shap_analysis.py",
+    ]
+
+    # Check for explainability in source
+    source_files = list(Path(path).rglob("*.py"))
+    has_model_code = False
+    has_explainability = False
+
+    model_patterns = [
+        r"model\.fit\s*\(", r"model\.train\s*\(", r"trainer\.train\s*\(",
+        r"\.compile\s*\(.*loss", r"torch\.nn\.", r"tf\.keras\.",
+        r"sklearn\.\w+\.\w+\s*\(",
+    ]
+
+    for sf in source_files:
+        try:
+            content = open(sf).read()
+        except:
+            continue
+
+        if any(re.search(p, content) for p in model_patterns):
+            has_model_code = True
+
+        if any(re.search(p, content) for p in explainability_patterns):
+            has_explainability = True
+
+    # Check for dedicated explainability files
+    for pattern in explainability_files:
+        if list(Path(path).rglob(pattern)):
+            has_explainability = True
+
+    # Check config for explainability requirements
+    for cf in list(Path(path).rglob("ai-config.yaml")) + list(Path(path).rglob("ai-config.yml")):
+        try:
+            content = open(cf).read()
+            if "explainability" in content.lower() or "interpretability" in content.lower():
+                has_explainability = True
+        except:
+            pass
+
+    if has_model_code and not has_explainability:
+        issues.append("ML model code found but no explainability artifacts (SHAP, LIME, etc.)")
+        issues.append("Consider adding model interpretability for compliance")
+
+    passed = len(issues) == 0
+    if not has_model_code:
+        return {
+            "validator": "explainability",
+            "passed": True,
+            "severity": "info",
+            "message": "No ML model training code found (explainability N/A)",
+            "details": []
+        }
+
+    return {
+        "validator": "explainability",
+        "passed": passed,
+        "severity": "medium" if not passed else "info",
+        "message": "Explainability artifacts found" if passed else "Missing explainability artifacts",
+        "details": issues
+    }
+
+# ═════════════════════════════════════════════════════════
+# Run all 4 validators
+# ═════════════════════════════════════════════════════════
+validators = [
+    check_ai_governance_config,
+    check_model_attestation,
+    check_rate_limiting,
+    check_explainability
+]
+
+for check_fn in validators:
+    try:
+        result = check_fn(target_path)
+        results["validators"].append(result)
+    except Exception as e:
+        results["validators"].append({
+            "validator": check_fn.__name__.replace("check_", ""),
+            "passed": False,
+            "severity": "high",
+            "message": f"Validator error: {e}",
+            "details": [str(e)]
+        })
+
+# Calculate compliance score
+total = len(results["validators"])
+passed = sum(1 for v in results["validators"] if v["passed"])
+results["compliance_score"] = int((passed / total) * 100) if total > 0 else 0
+results["total_validators"] = total
+results["passed_validators"] = passed
+
+naab_return(json.dumps(results))
+    >>
+
+    # ── Display Results ──
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("AI GOVERNANCE COMPLIANCE REPORT")
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("")
+
+    let validators = ai_results.validators
+    let total_v = ai_results.total_validators
+    let passed_v = ai_results.passed_validators
+
+    for v in validators {
+        let icon = "X"
+        if v.passed { icon = "+" }
+
+        let sev_tag = ""
+        if v.passed == false {
+            sev_tag = " [" + v.severity + "]"
+        }
+
+        print("  " + icon + " " + v.validator + sev_tag)
+        print("    " + v.message)
+
+        if v.passed == false {
+            let details = v.details
+            let d = 0
+            while d < array.length(details) {
+                print("      - " + details[d])
+                d = d + 1
+            }
+        }
+        print("")
+    }
+
+    print("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
+    print("Compliance Score: " + "" + ai_results.compliance_score + "%")
+    print("Validators: " + "" + passed_v + "/" + "" + total_v + " passed")
+
+    if ai_results.compliance_score == 100 {
+        print("Status: COMPLIANT")
+    } else if ai_results.compliance_score >= 50 {
+        print("Status: PARTIAL COMPLIANCE — action required")
+    } else {
+        print("Status: NON-COMPLIANT — immediate action required")
+    }
+
+    # ── Optional file output ──
+    if string.length(output_path) > 0 {
+        let json_output = <<python[ai_results] -> JSON
+import json
+data = json.loads(ai_results) if isinstance(ai_results, str) else ai_results
+naab_return(json.dumps(data, indent=2))
+        >>
+        file.write(output_path, json_output)
+        print("")
+        print("Results written to: " + output_path)
+    }
+}
