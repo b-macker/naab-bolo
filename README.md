@@ -1,10 +1,11 @@
 # NAAb BOLO
 
-**"Be On the Lookout"** for bad code.
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![NAAb](https://img.shields.io/badge/NAAb-Ecosystem-purple.svg)](https://github.com/b-macker/NAAb)
 
-Enterprise LLM & AI governance platform. 50+ static analysis checks. 5 governance profiles. SARIF, HTML, JSON, CSV, JUnit reports. 7 enforcement gates. 4 AI governance validators.
+**"Be On the Lookout"** for bad code. Enterprise LLM & AI governance platform built 100% in [NAAb](https://github.com/b-macker/NAAb).
 
-**100% NAAb.** Every script uses the best language for every task via polyglot blocks.
+50+ static analysis checks. 5 governance profiles. SARIF, HTML, JSON, CSV, JUnit reports. 7 enforcement gates. 4 AI governance validators.
 
 ```
 $ naab-lang scan.naab ./src --profile enterprise
@@ -25,6 +26,8 @@ Files with issues:3
 Total violations: 3
 ```
 
+---
+
 ## Why Polyglot?
 
 Every block uses the **right language for the job**:
@@ -39,6 +42,8 @@ Every block uses the **right language for the job**:
 | CLI orchestration | **NAAb** | Clean argument parsing, profile management, colored output, flow control. |
 
 **Zero standalone .py files. Zero standalone .cpp files.** Everything lives in 5 NAAb scripts.
+
+---
 
 ## Quick Start
 
@@ -63,6 +68,8 @@ bash build.sh
 ./naab/build/naab-lang ai-check.naab /path/to/ml-project
 ```
 
+---
+
 ## Commands
 
 | Command | Script | Description |
@@ -73,6 +80,8 @@ bash build.sh
 | `ai-check` | `ai-check.naab` | AI governance — model attestation, rate limiting, explainability |
 | `profiles` | `bolo.naab` | List available governance profiles |
 
+---
+
 ## Profiles
 
 | Profile | Focus | Checks |
@@ -82,6 +91,8 @@ bash build.sh
 | `security` | Vulnerabilities | Secrets, injection, escalation, traversal, exfiltration |
 | `ai-governance` | ML compliance | Model attestation, rate limiting, explainability, governance config |
 | `standard` | Balanced | Core secrets + LLM anti-drift + shell injection |
+
+---
 
 ## Report Formats
 
@@ -102,6 +113,8 @@ naab-lang report.naab ./src --format csv --output report.csv
 naab-lang report.naab ./src --format junit --output report.xml
 ```
 
+---
+
 ## Enforcement Stages
 
 ```bash
@@ -115,6 +128,8 @@ naab-lang enforce.naab ./src --stage ci
 naab-lang enforce.naab ./src --stage pr-merge
 ```
 
+---
+
 ## GitHub Action
 
 ```yaml
@@ -124,6 +139,8 @@ naab-lang enforce.naab ./src --stage pr-merge
     profile: enterprise
     format: sarif
 ```
+
+---
 
 ## Architecture
 
@@ -136,6 +153,8 @@ report.naab ── NAAb + Python ──── SARIF/HTML/JSON/CSV/JUnit generati
 enforce.naab ─ NAAb + Python ──── 7 gates + 17 validators
 ai-check.naab  NAAb + Python ──── 4 AI governance validators
 ```
+
+---
 
 ## Testing
 
@@ -152,10 +171,36 @@ bash tests/run-all-tests.sh
 ./naab/build/naab-lang tests/test-integration.naab
 ```
 
-## Built With
+---
 
-[NAAb](https://github.com/b-macker/NAAb) — The polyglot programming language. Best language for every task.
+## NAAb Ecosystem
+
+**NAAb BOLO** is part of the NAAb ecosystem:
+
+- **[NAAb Language](https://github.com/b-macker/NAAb)** — Core polyglot scripting language with governance
+- **NAAb BOLO** (this project) — Polyglot code executor and validator
+- **[NAAb Pivot](https://github.com/b-macker/naab-pivot)** — Code evolution and optimization platform
+
+---
+
+## Contributing
+
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for build instructions and guidelines.
+
+### Areas for Contribution
+- Additional governance checks
+- New enforcement validators
+- IDE integrations
+- Documentation improvements
+
+---
 
 ## License
 
-MIT
+MIT License - see [LICENSE](LICENSE) for details.
+
+**Brandon Mackert** - [@b-macker](https://github.com/b-macker)
+
+---
+
+_NAAb BOLO — Governance without the gatekeeping._
