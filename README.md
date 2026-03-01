@@ -49,6 +49,43 @@ Every block uses the **right language for the job**:
 
 ---
 
+## Demo
+
+See NAAb BOLO detecting security vulnerabilities and LLM-generated issues in real code:
+
+### Step 1: Vulnerable Code
+Example authentication code with **4 security issues**:
+
+![Step 1 - Vulnerable Code](demos/screenshots/Step_1.jpg)
+
+### Step 2: BOLO Scan Results 🔍
+**Enterprise profile scan** detects all violations with detailed help:
+
+![Step 2 - Scan Results](demos/screenshots/Step_2.jpg)
+
+BOLO detected:
+- ✗ **Hardcoded secrets** - API key and password in source
+- ✗ **SQL injection** - String concatenation in queries
+- ✗ **LLM stub function** - `validate_input()` only contains `pass`
+- ✗ **Code injection** - Unsafe `function()` in Python block
+
+**Files scanned: 2 | Violations: 4 | Execution time: 3.01ms**
+
+### Step 3: Clean Code Comparison ✅
+Shows how to fix the issues:
+
+![Step 3 - Clean Code](demos/screenshots/Step_3.jpg)
+
+**Try the demo yourself:**
+```bash
+cd demos
+./bolo-demo.sh
+```
+
+See [DEMO_GUIDE.md](DEMO_GUIDE.md) for recording instructions.
+
+---
+
 ## Quick Start
 
 ```bash
