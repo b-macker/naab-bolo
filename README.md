@@ -1,7 +1,11 @@
 # NAAb BOLO
 
+[![CI](https://github.com/b-macker/naab-bolo/actions/workflows/ci.yml/badge.svg)](https://github.com/b-macker/naab-bolo/actions/workflows/ci.yml)
+[![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/b-macker/naab-bolo/releases/tag/v1.0.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![NAAb](https://img.shields.io/badge/NAAb-Ecosystem-purple.svg)](https://github.com/b-macker/NAAb)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Discussions](https://img.shields.io/badge/Discussions-enabled-blue.svg)](https://github.com/b-macker/naab-bolo/discussions)
 
 **"Be On the Lookout"** for bad code. Enterprise LLM & AI governance platform built 100% in [NAAb](https://github.com/b-macker/NAAb).
 
