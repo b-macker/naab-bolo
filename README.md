@@ -178,8 +178,9 @@ bash tests/run-all-tests.sh
 **NAAb BOLO** is part of the NAAb ecosystem:
 
 - **[NAAb Language](https://github.com/b-macker/NAAb)** — Core polyglot scripting language with governance
-- **NAAb BOLO** (this project) — Polyglot code executor and validator
-- **[NAAb Pivot](https://github.com/b-macker/naab-pivot)** — Code evolution and optimization platform
+- **NAAb BOLO** (this project) — Code governance & AI validation
+- **[NAAb Pivot](https://github.com/b-macker/naab-pivot)** — Code evolution & optimization (3-60x speedups)
+- **[NAAb Passage](https://github.com/b-macker/naab-passage)** — Data gateway & PII protection (zero leakage)
 
 ---
 
