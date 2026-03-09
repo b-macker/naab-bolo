@@ -1,0 +1,4 @@
+User-agent: *
+Allow: /
+
+Sitemap: https://b-macker.github.io/naab-bolo/sitemap.xml
