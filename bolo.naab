@@ -93,7 +93,7 @@ main {
                 i = i + 1
                 output_path = args[i]
             }
-        } else if string.startswith(arg, "-") == false {
+        } else if arg.starts_with("-") == false {
             target_path = arg
         }
         i = i + 1

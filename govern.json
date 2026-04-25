@@ -1,0 +1,25 @@
+{
+  "version": "1.0.0",
+  "project_name": "NAAb-BOLO",
+  "mode": "enforce",
+  "description": "BOLO — Be On the Lookout. Enterprise LLM & AI governance platform.",
+
+  "languages": {
+    "require_explicit": true,
+    "allowed": ["python", "shell"]
+  },
+
+  "capabilities": {
+    "network": false,
+    "shell": true,
+    "filesystem": {
+      "allowed_paths": ["./"]
+    }
+  },
+
+  "code_quality": {
+    "no_secrets": { "enabled": true, "level": "hard" },
+    "no_stub_functions": { "enabled": true, "level": "soft" },
+    "no_todo_comments": { "enabled": true, "level": "advisory" }
+  }
+}
