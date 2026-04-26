@@ -13,7 +13,7 @@
     "network": false,
     "shell": true,
     "filesystem": {
-      "allowed_paths": ["./"]
+      "allowed_paths": ["./", "/data/data/com.termux/files/home/"]
     }
   },
 

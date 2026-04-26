@@ -105,14 +105,18 @@ main {
     # ── Discover files using Shell ──
     # WHY SHELL: find is universal, portable, and fast for file listing
     let files_json = <<shell[target_path]
-        find "$target_path" -type f \( \
+        find "$target_path" -type d \( \
+            -name "external" -o -name "vendor" -o -name "node_modules" -o \
+            -name ".git" -o -name "build" -o -name "__pycache__" -o \
+            -name ".venv" -o -name "venv" \
+        \) -prune -o -type f \( \
             -name "*.py" -o -name "*.js" -o -name "*.ts" -o \
             -name "*.go" -o -name "*.rs" -o -name "*.cpp" -o \
             -name "*.java" -o -name "*.rb" -o -name "*.php" -o \
             -name "*.sh" -o -name "*.bash" -o -name "*.cs" -o \
             -name "*.cc" -o -name "*.cxx" -o -name "*.c" -o \
-            -name "*.h" -o -name "*.hpp" \
-        \) 2>/dev/null | head -1000
+            -name "*.h" -o -name "*.hpp" -o -name "*.naab" \
+        \) -print 2>/dev/null | head -1000
     >>
 
     let file_list = string.split(string.trim(files_json), "\n")
@@ -159,6 +163,8 @@ main {
             if ext == "php" { lang = "php" }
             if ext == "sh" { lang = "shell" }
             if ext == "bash" { lang = "shell" }
+            let is_naab = false
+            if ext == "naab" { lang = "javascript"; is_naab = true }
             if ext == "cs" { lang = "csharp" }
 
             if lang == "unknown" { continue }
@@ -166,7 +172,25 @@ main {
             # Read file content
             try {
                 let code = file.read(filepath)
-                let violations = bolo.scan(lang, code)
+                let all_violations = bolo.scan(lang, code)
+
+                # Filter false positives for .naab files
+                # NAAb uses print() natively — not a cross-language hallucination
+                let violations = []
+                for av in all_violations {
+                    if is_naab == true {
+                        if av["rule"] == "code_quality.no_hallucinated_apis" {
+                            if string.index_of(av["message"], "print(") != -1 {
+                                continue
+                            }
+                            if string.index_of(av["message"], "\"or\"") != -1 {
+                                continue
+                            }
+                        }
+                    }
+                    violations = array.push(violations, av)
+                }
+
                 let vcount = array.length(violations)
 
                 if vcount > 0 {
