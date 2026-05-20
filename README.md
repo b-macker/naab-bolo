@@ -1,34 +1,24 @@
-# NAAb BOLO
+# NAAb BOLO — Catch AI Code Mistakes Before They Ship
 
 [![CI](https://github.com/b-macker/naab-bolo/actions/workflows/ci.yml/badge.svg)](https://github.com/b-macker/naab-bolo/actions/workflows/ci.yml)
 [![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)](https://github.com/b-macker/naab-bolo/releases/tag/v1.0.0)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 [![NAAb](https://img.shields.io/badge/NAAb-Ecosystem-purple.svg)](https://github.com/b-macker/NAAb)
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
-[![Discussions](https://img.shields.io/badge/Discussions-enabled-blue.svg)](https://github.com/b-macker/naab-bolo/discussions)
 
-**"Be On the Lookout"** for bad code. Enterprise LLM & AI governance platform built 100% in [NAAb](https://github.com/b-macker/NAAb).
-
-50+ static analysis checks. 5 governance profiles. SARIF, HTML, JSON, CSV, JUnit reports. 7 enforcement gates. 4 AI governance validators.
+AI models generate code that looks right but isn't. BOLO ("Be On the Lookout") scans it before it ships.
 
 ```
 $ naab-lang scan.naab ./src --profile enterprise
 
-NAAb BOLO Scanner [enterprise]
-Scanning 47 files in ./src
+  ✗ src/auth.py:12  [no_secrets]         Hardcoded API key detected
+  ✗ src/db.py:8     [no_sql_injection]   String formatting in SQL query
+  ✗ src/utils.py:45 [oversimplification] validate_input() contains only 'pass'
 
-  X src/auth.py:12 [no_secrets]
-    Hardcoded API key detected
-  X src/db.py:8 [no_sql_injection]
-    String formatting in SQL query
-  ! src/utils.py:45 [oversimplification.stub_function]
-    Stub function: validate_input() contains only 'pass'
-
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Files scanned:    47
-Files with issues:3
-Total violations: 3
+  3 violations — fix before merging
 ```
+
+50+ checks · Hardcoded secrets · Hallucinated APIs · Stub functions shipped as real code · Empty catch blocks · SQL injection · SARIF output for GitHub Code Scanning · Part of the [NAAb ecosystem](https://github.com/b-macker/NAAb)
 
 ---
 
@@ -246,3 +236,4 @@ MIT License - see [LICENSE](LICENSE) for details.
 ---
 
 _NAAb BOLO — Governance without the gatekeeping._
+
